@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.text.Editable
 import android.widget.Button
 import android.widget.EditText
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -14,27 +15,40 @@ import androidx.lifecycle.lifecycleScope
 import com.android.volley.AuthFailureError
 import com.android.volley.Request
 import com.android.volley.Response
+import com.android.volley.VolleyError
 import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
+import java.nio.charset.Charset
 
 class MainActivity : AppCompatActivity()
 {
     private lateinit var dataStore: DataStore<Preferences>
+    private var userProfile: JSONObject? = null;
 
     override fun onCreate(savedInstanceState: Bundle?)
     {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main);
+        //setContentView(R.layout.activity_main);
         dataStore = createDataStore(name = "settings")
-        findViewById<Button>(R.id.LogButton).setOnClickListener{
-            lifecycleScope.launch {
+        //findViewById<Button>(R.id.LogButton).setOnClickListener{
+            //runBlocking {
                 sendLoginRequest();
-                makeRegister();
-            }
-        }
+           // }
+       // }
+    }
+
+    private fun showUserProfile()
+    {
+        setContentView(R.layout.user_profile)
+        val userLogin : TextView = findViewById(R.id.UserName);
+        userLogin.setText(userProfile!!.get("name").toString());
     }
 
     private fun makeRegister()
@@ -43,7 +57,7 @@ class MainActivity : AppCompatActivity()
         val form = findViewById<EditText>(R.id.NameForm);
 
         findViewById<Button>(R.id.SubmitButton).setOnClickListener {
-            lifecycleScope.launch {
+            runBlocking {
                 sendRegisterRequest(form.text);
             }
         }
@@ -58,14 +72,19 @@ class MainActivity : AppCompatActivity()
             getString(R.string.back_url) + "register",
             Response.Listener
             { response ->
-                val responseJson = JSONObject(response)
-                if (!responseJson.isNull("token"))
-                    lifecycleScope.launch{
-                        save("token", responseJson.get("token").toString())
-                    }
-            },
-            { response ->
+                println("response = ");
                 println(response);
+                userProfile = JSONObject(response)
+                showUserProfile();
+            },
+            {
+                error ->
+                val tmp = String(error.networkResponse.data, Charset.forName("UTF-8"));
+                val response = JSONObject(tmp);
+                if (response.get("statusCode") === 400)
+                    ;//toast returned message
+                println(response.get("statusCode"))
+                println(response.get("message"))
             })
         {
             @Throws(AuthFailureError::class)
@@ -86,34 +105,42 @@ class MainActivity : AppCompatActivity()
         queue.add(stringRequest)
     }
 
-    private suspend fun sendLoginRequest()
+    private fun sendLoginRequest()
     {
         val queue = Volley.newRequestQueue(this)
-        var token: String = read("token") ?: "";
 
-        val stringRequest = object : StringRequest(Request.Method.POST,
-            getString(R.string.back_url) + "login",
-            Response.Listener
-            { response ->
-                val responseJson = JSONObject(response)
-                if (!responseJson.isNull("token"))
-                    lifecycleScope.launch{
-                        save("token", responseJson.get("token").toString())
+        lifecycleScope.launch {
+            var token = read("token") ?: "";
+            val stringRequest = object : StringRequest(Request.Method.POST,
+                getString(R.string.back_url) + "login",
+                Response.Listener
+                { response ->
+                    userProfile = JSONObject(response)
+                    println("login response = ")
+                    println(response);
+                    lifecycleScope.launch {
+                        if (!userProfile!!.isNull("token"))
+                            save("token", userProfile!!.get("token").toString())
+                        if (userProfile!!.get("registered") === true)
+                            showUserProfile();
+                        else
+                            makeRegister();
                     }
-            },
-            { response ->
-                println(response);
-            })
-            {
+                },
+                { response ->
+                    println("error login request = ")
+                    println(response);
+                    //show toast network error
+                }) {
                 @Throws(AuthFailureError::class)
-                override fun getHeaders(): MutableMap<String, String>
-                {
+                override fun getHeaders(): MutableMap<String, String> {
                     val headers = HashMap<String, String>();
-                    headers["Authorization"] = token ?: "";
+                        headers["Authorization"] = token;
                     return headers;
                 }
             }
-        queue.add(stringRequest)
+            queue.add(stringRequest)
+        }
     }
 
     private suspend fun save(key: String, value: String)
