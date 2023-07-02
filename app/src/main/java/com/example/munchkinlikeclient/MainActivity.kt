@@ -31,24 +31,97 @@ class MainActivity : AppCompatActivity()
 {
     private lateinit var dataStore: DataStore<Preferences>
     private var userProfile: JSONObject? = null;
+    private var GameInfo: JSONObject? = null;
 
     override fun onCreate(savedInstanceState: Bundle?)
     {
         super.onCreate(savedInstanceState)
-        //setContentView(R.layout.activity_main);
         dataStore = createDataStore(name = "settings")
-        //findViewById<Button>(R.id.LogButton).setOnClickListener{
-            //runBlocking {
                 sendLoginRequest();
-           // }
-       // }
     }
 
     private fun showUserProfile()
     {
         setContentView(R.layout.user_profile)
-        val userLogin : TextView = findViewById(R.id.UserName);
+        val userLogin: TextView = findViewById(R.id.UserName);
         userLogin.setText(userProfile!!.get("name").toString());
+        findViewById<Button>(R.id.CreateButton).setOnClickListener {
+            createGame();
+        }
+        /*findViewById<Button>(R.id.ResumeButton).setOnClickListener {
+            setContentView(R.layout.resume_game)
+        }
+        findViewById<Button>(R.id.JoinButton).setOnClickListener {
+            setContentView(R.layout.join_game)
+        }*/
+    }
+
+    private fun showGameInfo()
+    {
+        setContentView(R.layout.game_info)
+        val gameName: TextView = findViewById(R.id.GameName);
+        val gameOwner: TextView = findViewById(R.id.GameOwner);
+        val joinToken: TextView = findViewById(R.id.JoinToken);
+
+        gameName.setText(GameInfo!!.get("name").toString());
+        gameOwner.setText(GameInfo!!.getJSONObject("owner").get("name").toString());
+        joinToken.setText(GameInfo!!.get("joinToken").toString());
+
+    }
+
+    private fun createGame()
+    {
+        setContentView(R.layout.new_game)
+        val form = findViewById<EditText>(R.id.GameNameForm);
+
+        findViewById<Button>(R.id.CreateButton).setOnClickListener {
+            runBlocking {
+                sendCreateRequest(form.text);
+            }
+        }
+    }
+
+    private suspend fun sendCreateRequest(gameName : Editable)
+    {
+        val queue = Volley.newRequestQueue(this)
+        var token: String = read("token") ?: "";
+
+        val stringRequest = object : StringRequest(Request.Method.POST,
+            getString(R.string.back_url) + "create",
+            Response.Listener
+            { response ->
+                println("create response = ");
+                println(response);
+                GameInfo = JSONObject(response)
+                showGameInfo();
+            },
+            {
+                error ->
+                println("create request")
+                val tmp = String(error.networkResponse.data, Charset.forName("UTF-8"));
+                val response = JSONObject(tmp);
+                if (response.get("statusCode") === 400)
+                    ;//toast returned message
+                println(response.get("statusCode"))
+                println(response.get("message"))
+            })
+        {
+            @Throws(AuthFailureError::class)
+            override fun getHeaders(): MutableMap<String, String>
+            {
+                val headers = HashMap<String, String>();
+                headers["Authorization"] = token ?: "";
+                return headers;
+            }
+
+            override fun getParams(): Map<String, String>
+            {
+                val params: MutableMap<String, String> = HashMap()
+                params["GameName"] = gameName.toString();
+                return params
+            }
+        }
+        queue.add(stringRequest)
     }
 
     private fun makeRegister()
@@ -72,17 +145,18 @@ class MainActivity : AppCompatActivity()
             getString(R.string.back_url) + "register",
             Response.Listener
             { response ->
-                println("response = ");
+                println("register response = ");
                 println(response);
                 userProfile = JSONObject(response)
                 showUserProfile();
             },
             {
-                error ->
+                    error ->
+                println("register request")
                 val tmp = String(error.networkResponse.data, Charset.forName("UTF-8"));
                 val response = JSONObject(tmp);
                 if (response.get("statusCode") === 400)
-                    ;//toast returned message
+                ;//toast returned message
                 println(response.get("statusCode"))
                 println(response.get("message"))
             })
@@ -127,10 +201,15 @@ class MainActivity : AppCompatActivity()
                             makeRegister();
                     }
                 },
-                { response ->
-                    println("error login request = ")
-                    println(response);
-                    //show toast network error
+                {
+                        error ->
+                    println("login request")
+                    val tmp = String(error.networkResponse.data, Charset.forName("UTF-8"));
+                    val response = JSONObject(tmp);
+                    if (response.get("statusCode") === 400)
+                    ;//toast returned message
+                    println(response.get("statusCode"))
+                    println(response.get("message"))
                 }) {
                 @Throws(AuthFailureError::class)
                 override fun getHeaders(): MutableMap<String, String> {
