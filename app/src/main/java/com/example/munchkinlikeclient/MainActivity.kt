@@ -2,8 +2,10 @@ package com.example.munchkinlikeclient
 
 import android.os.Bundle
 import android.text.Editable
+import android.widget.AdapterView.OnItemClickListener
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ListView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.datastore.core.DataStore
@@ -15,23 +17,24 @@ import androidx.lifecycle.lifecycleScope
 import com.android.volley.AuthFailureError
 import com.android.volley.Request
 import com.android.volley.Response
-import com.android.volley.VolleyError
 import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
+import com.google.android.material.slider.RangeSlider
+import com.google.android.material.slider.Slider
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import org.json.JSONArray
 import org.json.JSONObject
 import java.nio.charset.Charset
+
 
 class MainActivity : AppCompatActivity()
 {
     private lateinit var dataStore: DataStore<Preferences>
     private var userProfile: JSONObject? = null;
     private var GameInfo: JSONObject? = null;
+    private var GameList: JSONArray? = null;
 
     override fun onCreate(savedInstanceState: Bundle?)
     {
@@ -48,12 +51,37 @@ class MainActivity : AppCompatActivity()
         findViewById<Button>(R.id.CreateButton).setOnClickListener {
             createGame();
         }
-        /*findViewById<Button>(R.id.ResumeButton).setOnClickListener {
+        findViewById<Button>(R.id.ResumeButton).setOnClickListener {
             setContentView(R.layout.resume_game)
-        }
+            runBlocking {
+                getGameList();
+            }
+        }/*
         findViewById<Button>(R.id.JoinButton).setOnClickListener {
             setContentView(R.layout.join_game)
         }*/
+    }
+
+    private fun showGameList(data : JSONArray?)
+    {
+        var adapter: ListAdapter
+        val projectList: ArrayList<DataModel?> = ArrayList()
+        val list: ListView = findViewById(R.id.projectList);
+        var i = 0;
+
+        if (GameList === null)
+            return ;
+        while (i < GameList!!.length()!!)
+        {
+            projectList.add(DataModel(GameList?.getJSONObject(i)?.get("id").toString().toInt(),
+                GameList?.getJSONObject(i)?.get("name").toString()))
+            i++;
+        }
+        adapter = ListAdapter(applicationContext, projectList)
+        list.setAdapter(adapter);
+        list.setOnItemClickListener(OnItemClickListener { parent, view, position, id ->
+            println(adapter.getItem(position)?.getPair()?.first);
+        })
     }
 
     private fun showGameInfo()
@@ -73,21 +101,58 @@ class MainActivity : AppCompatActivity()
     {
         setContentView(R.layout.new_game)
         val form = findViewById<EditText>(R.id.GameNameForm);
+        val slide : Slider = findViewById<Slider>(R.id.PlayerSlider);
 
         findViewById<Button>(R.id.CreateButton).setOnClickListener {
             runBlocking {
-                sendCreateRequest(form.text);
+                sendCreateRequest(form.text, slide.value);
             }
         }
     }
 
-    private suspend fun sendCreateRequest(gameName : Editable)
+    private suspend fun getGameList()
+    {
+        val queue = Volley.newRequestQueue(this)
+        var token: String = read("token") ?: "";
+
+        val stringRequest = object : StringRequest(Request.Method.GET,
+            getString(R.string.back_url) + "game/" + "getgamelist",
+            Response.Listener
+            { response ->
+                println("gamelist response = ");
+                println(response);
+                GameList = JSONArray(response)
+                showGameList(GameList);
+            },
+            {
+                    error ->
+                println("gamelist request")
+                val tmp = String(error.networkResponse.data, Charset.forName("UTF-8"));
+                val response = JSONObject(tmp);
+                if (response.get("statusCode") === 400)
+                ;//toast returned message
+                println(response.get("statusCode"))
+                println(response.get("message"))
+            })
+        {
+            @Throws(AuthFailureError::class)
+            override fun getHeaders(): MutableMap<String, String>
+            {
+                val headers = HashMap<String, String>();
+                headers["Authorization"] = token ?: "";
+                return headers;
+            }
+        }
+        queue.add(stringRequest)
+    }
+
+    private suspend fun sendCreateRequest(gameName : Editable, maxPlayer : Number)
     {
         val queue = Volley.newRequestQueue(this)
         var token: String = read("token") ?: "";
 
         val stringRequest = object : StringRequest(Request.Method.POST,
-            getString(R.string.back_url) + "create",
+            getString(R.string.back_url) + "game/" + "create",
             Response.Listener
             { response ->
                 println("create response = ");
@@ -118,6 +183,7 @@ class MainActivity : AppCompatActivity()
             {
                 val params: MutableMap<String, String> = HashMap()
                 params["GameName"] = gameName.toString();
+                params["MaxPlayer"] = maxPlayer.toInt().toString();
                 return params
             }
         }
@@ -142,7 +208,7 @@ class MainActivity : AppCompatActivity()
         var token: String = read("token") ?: "";
 
         val stringRequest = object : StringRequest(Request.Method.POST,
-            getString(R.string.back_url) + "register",
+            getString(R.string.back_url) + "auth/" + "register",
             Response.Listener
             { response ->
                 println("register response = ");
@@ -186,7 +252,7 @@ class MainActivity : AppCompatActivity()
         lifecycleScope.launch {
             var token = read("token") ?: "";
             val stringRequest = object : StringRequest(Request.Method.POST,
-                getString(R.string.back_url) + "login",
+                getString(R.string.back_url) + "auth/" + "login",
                 Response.Listener
                 { response ->
                     userProfile = JSONObject(response)

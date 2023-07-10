@@ -29,15 +29,44 @@
         app:layout_constraintEnd_toEndOf="parent"
         />
 
+    <TextView
+        android:id="@+id/Title2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="30dp"
+        android:text="Max player :"
+        app:layout_constraintTop_toBottomOf="@id/GameNameForm"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        />
+
+    <com.google.android.material.slider.Slider
+        android:id="@+id/PlayerSlider"
+        android:layout_width="300dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@+id/Title2"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:valueFrom="2"
+        android:valueTo="8"
+        android:stepSize="1"
+        android:value="5"
+        app:labelBehavior="withinBounds"
+        app:tickColor="@color/white"
+        app:tickVisible="true"
+        />
+
     <Button
         android:id="@+id/CreateButton"
         android:layout_width="150dp"
         android:layout_height="wrap_content"
         android:text="Create"
-        app:layout_constraintTop_toBottomOf="@+id/GameNameForm"
+        app:layout_constraintTop_toBottomOf="@+id/PlayerSlider"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="10dp"
         />
+
+
 
 </androidx.constraintlayout.widget.ConstraintLayout>
