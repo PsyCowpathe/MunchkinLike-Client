@@ -20,7 +20,9 @@ class ListAdapter(private val context: Context, values: ArrayList<DataModel?>?) 
             context.getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
         rowView = inflater?.inflate(R.layout.row_item, parent, false)
         val nameView = rowView!!.findViewById<View>(R.id.name) as TextView
-        nameView.text = dataModel!!.getPair().second;
+        val idView = rowView!!.findViewById<View>(R.id.max) as TextView
+        nameView.text = dataModel!!.getName();
+        idView.text = dataModel!!.getMax().toString();
         return rowView
     }
 }
