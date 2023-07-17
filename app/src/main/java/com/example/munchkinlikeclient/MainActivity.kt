@@ -242,10 +242,15 @@ class MainActivity : AppCompatActivity()
             {
                     error ->
                 println("join request")
-                val tmp = String(error.networkResponse.data, Charset.forName("UTF-8"))
-                val response = JSONObject(tmp)
-                val toPrint = "Error " + response.get("statusCode").toString() + " : "  + response.get("message")
-                Toast.makeText(this, toPrint, Toast.LENGTH_LONG).show()
+                var tmp : String
+                if (error !== null && error.networkResponse !== null && error.networkResponse.data !== null)
+                {
+                    tmp = (String(error.networkResponse.data, Charset.forName("UTF-8")))
+                    val response = JSONObject(tmp)
+                    tmp = response.get("message").toString().substringAfter("[").substringBefore("]").split(",").first().removeSurrounding("\"")
+                    val toPrint = "Error " + response.get("statusCode").toString() + " : "  + tmp
+                    Toast.makeText(this, toPrint, Toast.LENGTH_SHORT).show()
+                }
             })
         {
             @Throws(AuthFailureError::class)
